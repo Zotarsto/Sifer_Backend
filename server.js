@@ -23,12 +23,16 @@ app.use((req, res, next) => {
   });
   
 
-// Rutas principales
+
+  // Rutas principales
 app.use('/api/cajeros', cajerosRoutes);
-app.use('/api/ventas', ventasRoutes);
+app.use('/api', ventasRoutes);
 app.use('/api/admin', authAdminRoutes);
 app.use('/api/cajero', authCajeroRoutes);
 app.use('/api', productosRoutes);
+
+
+
 
 
 // Configuración del servidor
