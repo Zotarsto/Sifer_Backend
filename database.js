@@ -4,7 +4,9 @@ const conexion = mysql.createConnection({
     host: 'databaseingsoft.crygkgmoihut.us-east-2.rds.amazonaws.com',
     database: 'DBSIFER',
     user: 'admin',
-    password: 'rootFCCingsoft'
+    password: 'rootFCCingsoft',
+    timezone: 'America/Mexico_City' // Configura tu zona horaria local
+
 });
 
 conexion.connect((error) => {

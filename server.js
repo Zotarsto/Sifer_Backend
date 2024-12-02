@@ -8,6 +8,7 @@ const ventasRoutes = require('./routes/ventas');
 const authAdminRoutes = require('./routes/authAdmin');
 const authCajeroRoutes = require('./routes/authCajero');
 const productosRoutes = require('./routes/productos');
+const reportesRoutes = require('./routes/reportes'); 
 
 const app = express();
 
@@ -26,11 +27,11 @@ app.use((req, res, next) => {
 
   // Rutas principales
 app.use('/api/cajeros', cajerosRoutes);
-app.use('/api', ventasRoutes);
 app.use('/api/admin', authAdminRoutes);
 app.use('/api/cajero', authCajeroRoutes);
+app.use('/api/reportes', reportesRoutes); 
+app.use('/api', ventasRoutes);
 app.use('/api', productosRoutes);
-
 
 
 

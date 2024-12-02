@@ -10,10 +10,7 @@ router.post('/ventas', async (req, res) => {
     return res.status(400).json({ mensaje: 'Datos incompletos' });
   }
 
-  console.log('Datos recibidos:', req.body);
-
   try {
-    // Registrar la venta en la tabla `ventas`
     const queryVenta = 'INSERT INTO ventas (id_cajero, total) VALUES (?, ?)';
     conexion.query(queryVenta, [id_cajero, total], (error, results) => {
       if (error) {
@@ -23,7 +20,6 @@ router.post('/ventas', async (req, res) => {
 
       const id_venta = results.insertId;
 
-      // Registrar los productos en `detalle_venta`
       const queryDetalle = `
         INSERT INTO detalle_venta (id_venta, id_producto, cantidad, precio, subtotal)
         VALUES ?
@@ -39,12 +35,9 @@ router.post('/ventas', async (req, res) => {
       conexion.query(queryDetalle, [detalles], (error) => {
         if (error) {
           console.error('Error al registrar el detalle de venta:', error);
-          return res
-            .status(500)
-            .json({ mensaje: 'Error al registrar el detalle de venta' });
+          return res.status(500).json({ mensaje: 'Error al registrar el detalle de venta' });
         }
 
-        // Resta el stock de cada producto
         const restarStockPromises = productos.map((p) => {
           return new Promise((resolve, reject) => {
             conexion.query(
@@ -52,15 +45,10 @@ router.post('/ventas', async (req, res) => {
               [p.cantidad, p.id_producto, p.cantidad],
               (error, results) => {
                 if (error) {
-                  console.error(
-                    `Error al restar stock para el producto ID ${p.id_producto}:`,
-                    error
-                  );
+                  console.error(`Error al restar stock para el producto ID ${p.id_producto}:`, error);
                   reject(error);
                 } else if (results.affectedRows === 0) {
-                  reject(
-                    `Stock insuficiente para el producto ID ${p.id_producto}`
-                  );
+                  reject(`Stock insuficiente para el producto ID ${p.id_producto}`);
                 } else {
                   resolve();
                 }
@@ -69,17 +57,11 @@ router.post('/ventas', async (req, res) => {
           });
         });
 
-        // Ejecuta todas las actualizaciones de stock
         Promise.all(restarStockPromises)
-          .then(() => {
-            res.status(201).json({ mensaje: 'Venta registrada con éxito' });
-          })
+          .then(() => res.status(201).json({ mensaje: 'Venta registrada con éxito' }))
           .catch((error) => {
             console.error('Error al actualizar el stock:', error);
-            res.status(500).json({
-              mensaje: 'Error al actualizar el stock de los productos',
-              error,
-            });
+            res.status(500).json({ mensaje: 'Error al actualizar el stock de los productos', error });
           });
       });
     });
@@ -87,6 +69,68 @@ router.post('/ventas', async (req, res) => {
     console.error('Error en el servidor:', error);
     res.status(500).json({ mensaje: 'Error en el servidor' });
   }
+});
+
+// Ruta para consultar ventas
+router.get('/ventas', (req, res) => {
+  const intervalo = req.query.intervalo || 'todas'; // Valor por defecto
+  let query = `
+    SELECT v.id AS id_venta, v.fecha_venta, v.total, c.nombre AS cajero
+    FROM ventas v
+    JOIN cajeros c ON v.id_cajero = c.id
+  `;
+
+  // Filtros según el intervalo
+  if (intervalo === 'diario') {
+    query += `WHERE DATE(v.fecha_venta) = CURDATE() `;
+  } else if (intervalo === 'mensual') {
+    query += `WHERE MONTH(v.fecha_venta) = MONTH(CURDATE()) AND YEAR(v.fecha_venta) = YEAR(CURDATE()) `;
+  } else if (intervalo === 'anual') {
+    query += `WHERE YEAR(v.fecha_venta) = YEAR(CURDATE()) `;
+  }
+
+  query += `ORDER BY v.fecha_venta DESC`;
+
+  conexion.query(query, (error, results) => {
+    if (error) {
+      console.error('Error al obtener ventas:', error);
+      return res.status(500).json({ mensaje: 'Error al obtener ventas' });
+    }
+
+    const ventasFiltradas = results.map((venta) => ({
+      id_venta: venta.id_venta || 'ID no disponible',
+      fecha_venta: venta.fecha_venta || 'Fecha no disponible',
+      total: venta.total || 0,
+      cajero: venta.cajero || 'Cajero no identificado',
+    }));
+
+    res.status(200).json(ventasFiltradas);
+  });
+});
+
+// Ruta para obtener detalles de una venta
+router.get('/ventas/:id', (req, res) => {
+  const ventaId = req.params.id;
+
+  const query = `
+    SELECT dv.id_producto, p.nombre, dv.cantidad, dv.precio, dv.subtotal
+    FROM detalle_venta dv
+    JOIN productos p ON dv.id_producto = p.id
+    WHERE dv.id_venta = ?
+  `;
+
+  conexion.query(query, [ventaId], (error, results) => {
+    if (error) {
+      console.error('Error al obtener detalles de la venta:', error);
+      return res.status(500).json({ mensaje: 'Error al obtener detalles de la venta' });
+    }
+
+    if (results.length === 0) {
+      return res.status(404).json({ mensaje: 'No se encontraron detalles para esta venta' });
+    }
+
+    res.status(200).json(results);
+  });
 });
 
 module.exports = router;
